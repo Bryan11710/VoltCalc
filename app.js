@@ -1,96 +1,141 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Platform } from 'react-native';
-import { initDatabase, guardarCalculoLocal, obtenerCalculosLocales } from './database/offlineManager';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
+import NativeComponentScreen from './components/NativeComponentScreen';
 
 export default function App() {
-  const [voltaje, setVoltaje] = useState('');
-  const [corriente, setCorriente] = useState('');
+  const [tipoCalculo, setTipoCalculo] = useState('corriente');
+  const [valorA, setValorA] = useState('');
+  const [valorB, setValorB] = useState('');
   const [resultado, setResultado] = useState(null);
-  const [historial, setHistorial] = useState([]);
 
-  useEffect(() => {
-    // Inicializamos la base de datos local al arrancar
-    const setupDB = async () => {
-      await initDatabase();
-      cargarHistorial();
-    };
-    setupDB();
-  }, []);
+  const handleCalcular = () => {
+    const numA = parseFloat(valorA);
+    const numB = parseFloat(valorB);
 
-  const cargarHistorial = async () => {
-    const datos = await obtenerCalculosLocales();
-    setHistorial(datos);
-  };
-
-  const calcularPotencia = async () => {
-    const v = parseFloat(voltaje);
-    const i = parseFloat(corriente);
-
-    if (isNaN(v) || isNaN(i)) {
-      alert('Por favor ingresa valores numéricos válidos');
+    if (isNaN(numA) || (tipoCalculo !== 'potencia' && isNaN(numB) && tipoCalculo !== 'corriente')) {
       return;
     }
 
-    const potencia = v * i;
-    setResultado(potencia);
+    let res = 0;
+    let unidad = '';
 
-    const idUnico = Date.now().toString();
-    const timestampActual = new Date().toISOString();
+    switch (tipoCalculo) {
+      case 'corriente':
+        if (numB === 0) {
+          Alert.alert('Error', 'La resistencia no puede ser cero.');
+          return;
+        }
+        res = numA / numB;
+        unidad = 'Amperios (A)';
+        break;
+      case 'voltaje':
+        res = numA * numB;
+        unidad = 'Voltios (V)';
+        break;
+      case 'resistencia':
+        if (numB === 0) {
+          Alert.alert('Error', 'La corriente no puede ser cero.');
+          return;
+        }
+        res = numA / numB;
+        unidad = 'Ohmios (Ω)';
+        break;
+      case 'potencia':
+        res = numA * numB;
+        unidad = 'Vatios (W)';
+        break;
+      default:
+        break;
+    }
 
-    // Guardamos localmente mediante SQLite / Mock web
-    await guardarCalculoLocal(idUnico, v, potencia, timestampActual);
-    await cargarHistorial();
+    setResultado(`${res.toFixed(2)} ${unidad}`);
+    Alert.alert('Cálculo Exitoso', `Resultado: ${res.toFixed(2)} ${unidad}`);
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>VoltCalc Mobile</Text>
-      <Text style={styles.subtitle}>Sistema de Cálculo y Respaldo Offline</Text>
+      <Text style={styles.headerTitle}>VoltCalc Mobile</Text>
+      <Text style={styles.subtitle}>Ingeniería en Tecnologías de la Información - UEA</Text>
 
+      {/* Módulo de Cálculo Eléctrico */}
       <View style={styles.card}>
-        <Text style={styles.label}>Voltaje (V):</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej. 12"
-          placeholderTextColor="#888"
-          keyboardType="numeric"
-          value={voltaje}
-          onChangeText={setVoltaje}
-        />
+        <Text style={styles.cardTitle}>Módulo de Cálculo de Física / Electricidad</Text>
+        
+        <Text style={styles.labelMenu}>Seleccione la magnitud a calcular:</Text>
+        <View style={styles.menuContainer}>
+          <TouchableOpacity 
+            style={[styles.menuButton, tipoCalculo === 'corriente' && styles.menuButtonActive]} 
+            onPress={() => { setTipoCalculo('corriente'); setResultado(null); setValorA(''); setValorB(''); }}
+          >
+            <Text style={[styles.menuButtonText, tipoCalculo === 'corriente' && styles.menuButtonTextActive]}>Corriente (I)</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.label}>Corriente (A):</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej. 2.5"
-          placeholderTextColor="#888"
-          keyboardType="numeric"
-          value={corriente}
-          onChangeText={setCorriente}
-        />
+          <TouchableOpacity 
+            style={[styles.menuButton, tipoCalculo === 'voltaje' && styles.menuButtonActive]} 
+            onPress={() => { setTipoCalculo('voltaje'); setResultado(null); setValorA(''); setValorB(''); }}
+          >
+            <Text style={[styles.menuButtonText, tipoCalculo === 'voltaje' && styles.menuButtonTextActive]}>Voltaje (V)</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button} onPress={calcularPotencia}>
-          <Text style={styles.buttonText}>Calcular Potencia (W)</Text>
+          <TouchableOpacity 
+            style={[styles.menuButton, tipoCalculo === 'resistencia' && styles.menuButtonActive]} 
+            onPress={() => { setTipoCalculo('resistencia'); setResultado(null); setValorA(''); setValorB(''); }}
+          >
+            <Text style={[styles.menuButtonText, tipoCalculo === 'resistencia' && styles.menuButtonTextActive]}>Resistencia (R)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.menuButton, tipoCalculo === 'potencia' && styles.menuButtonActive]} 
+            onPress={() => { setTipoCalculo('potencia'); setResultado(null); setValorA(''); setValorB(''); }}
+          >
+            <Text style={[styles.menuButtonText, tipoCalculo === 'potencia' && styles.menuButtonTextActive]}>Potencia (P)</Text>
+          </TouchableOpacity>
+        </View>
+
+        {tipoCalculo === 'corriente' && (
+          <>
+            <Text style={styles.formulaText}>Fórmula: I = V / R</Text>
+            <TextInput style={styles.input} placeholder="Ingrese Voltaje (V)" placeholderTextColor="#888" keyboardType="numeric" value={valorA} onChangeText={setValorA} />
+            <TextInput style={styles.input} placeholder="Ingrese Resistencia (Ω)" placeholderTextColor="#888" keyboardType="numeric" value={valorB} onChangeText={setValorB} />
+          </>
+        )}
+
+        {tipoCalculo === 'voltaje' && (
+          <>
+            <Text style={styles.formulaText}>Fórmula: V = I × R</Text>
+            <TextInput style={styles.input} placeholder="Ingrese Corriente (A)" placeholderTextColor="#888" keyboardType="numeric" value={valorA} onChangeText={setValorA} />
+            <TextInput style={styles.input} placeholder="Ingrese Resistencia (Ω)" placeholderTextColor="#888" keyboardType="numeric" value={valorB} onChangeText={setValorB} />
+          </>
+        )}
+
+        {tipoCalculo === 'resistencia' && (
+          <>
+            <Text style={styles.formulaText}>Fórmula: R = V / I</Text>
+            <TextInput style={styles.input} placeholder="Ingrese Voltaje (V)" placeholderTextColor="#888" keyboardType="numeric" value={valorA} onChangeText={setValorA} />
+            <TextInput style={styles.input} placeholder="Ingrese Corriente (A)" placeholderTextColor="#888" keyboardType="numeric" value={valorB} onChangeText={setValorB} />
+          </>
+        )}
+
+        {tipoCalculo === 'potencia' && (
+          <>
+            <Text style={styles.formulaText}>Fórmula: P = V × I</Text>
+            <TextInput style={styles.input} placeholder="Ingrese Voltaje (V)" placeholderTextColor="#888" keyboardType="numeric" value={valorA} onChangeText={setValorA} />
+            <TextInput style={styles.input} placeholder="Ingrese Corriente (A)" placeholderTextColor="#888" keyboardType="numeric" value={valorB} onChangeText={setValorB} />
+          </>
+        )}
+
+        <TouchableOpacity style={styles.button} onPress={handleCalcular}>
+          <Text style={styles.buttonText}>Calcular</Text>
         </TouchableOpacity>
 
-        {resultado !== null && (
-          <View style={styles.resultContainer}>
-            <Text style={styles.resultText}>Resultado: {resultado.toFixed(2)} W</Text>
-          </View>
+        {resultado && (
+          <Text style={styles.resultText}>Resultado: {resultado}</Text>
         )}
       </View>
 
-      <View style={styles.historySection}>
-        <Text style={styles.historyTitle}>Historial Local (SQLite)</Text>
-        {historial.length === 0 ? (
-          <Text style={styles.emptyText}>No hay registros guardados aún.</Text>
-        ) : (
-          historial.map((item, index) => (
-            <View key={item.id || index} style={styles.historyItem}>
-              <Text style={styles.historyText}>Voltaje: {item.valor_voltaje ?? item.voltaje} V</Text>
-              <Text style={styles.historyText}>Potencia: {item.resultado ?? item.potencia} W</Text>
-            </View>
-          ))
-        )}
+      {/* Módulo de Registro de Campo */}
+      <View style={styles.nativeWrapper}>
+        <NativeComponentScreen />
       </View>
     </ScrollView>
   );
@@ -99,101 +144,117 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#0f172a',
-    alignItems: 'center',
-    justifyContent: 'center',
     padding: 20,
+    backgroundColor: '#0a0a0a',
+    justifyContent: 'center',
   },
-  title: {
-    fontSize: 28,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#38bdf8',
-    marginBottom: 5,
     textAlign: 'center',
+    color: '#9370DB', // Morado claro/destacado
+    marginTop: 25,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
-    marginBottom: 20,
+    fontSize: 12,
     textAlign: 'center',
+    color: '#FFFFFF',
+    marginBottom: 20,
   },
   card: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    padding: 20,
-    width: '100%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    padding: 18,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#4B0082', // Morado oscuro (Indigo)
+    shadowColor: '#4B0082',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 5,
+    elevation: 4,
   },
-  label: {
-    fontSize: 14,
-    color: '#f1f5f9',
-    marginBottom: 5,
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  labelMenu: {
+    color: '#BA55D3',
+    fontSize: 13,
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  menuContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  menuButton: {
+    width: '48%',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#4B0082',
+    marginBottom: 8,
+    alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  menuButtonActive: {
+    backgroundColor: '#4B0082',
+  },
+  menuButtonText: {
+    color: '#BA55D3',
+    fontSize: 12,
     fontWeight: '600',
   },
+  menuButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  formulaText: {
+    color: '#aaa',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
   input: {
-    backgroundColor: '#0f172a',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#333333',
     borderRadius: 8,
-    color: '#fff',
     padding: 12,
-    fontSize: 16,
-    marginBottom: 15,
+    marginBottom: 12,
+    backgroundColor: '#000000',
+    color: '#FFFFFF',
   },
   button: {
-    backgroundColor: '#0284c7',
+    backgroundColor: '#4B0082',
+    padding: 14,
     borderRadius: 8,
-    padding: 15,
     alignItems: 'center',
     marginTop: 5,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#FFFFFF',
     fontWeight: 'bold',
-  },
-  resultContainer: {
-    marginTop: 20,
-    padding: 12,
-    backgroundColor: '#064e3b',
-    borderRadius: 8,
-    alignItems: 'center',
+    fontSize: 15,
   },
   resultText: {
-    color: '#34d399',
-    fontSize: 18,
+    marginTop: 14,
+    textAlign: 'center',
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#BA55D3',
   },
-  historySection: {
-    marginTop: 30,
-    width: '100%',
-    maxWidth: 400,
-  },
-  historyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#f8fafc',
-    marginBottom: 10,
-  },
-  emptyText: {
-    color: '#64748b',
-    fontStyle: 'italic',
-  },
-  historyItem: {
-    backgroundColor: '#1e293b',
-    padding: 10,
-    borderRadius: 6,
-    marginBottom: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#38bdf8',
-  },
-  historyText: {
-    color: '#cbd5e1',
-    fontSize: 14,
-  },
+  nativeWrapper: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#4B0082',
+  }
 });
